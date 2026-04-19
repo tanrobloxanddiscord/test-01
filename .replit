@@ -1,2 +1,10 @@
+modules = ["python-3.11"]
 [agent]
 expertMode = true
+
+[nix]
+
+[userenv]
+
+[userenv.shared]
+DISCORD_TOKEN = "MTQ5NTI0NDc0NTAyNTUxOTgwNg.GC0eHs.3toFTFkHkk3eJvcMX9yfnA2LyVDMNt-RU1s7s8"
