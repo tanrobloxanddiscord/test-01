@@ -1,7 +1,8 @@
 import discord
-from discord.ext import commands
-import re
 import os
+import re
+from discord.ext import commands
+from datetime import timedelta, datetime, timezone
 
 # 1. Setup Intents
 intents = discord.Intents.default()
@@ -112,6 +113,89 @@ async def embedcreate(ctx, target_channel: discord.TextChannel = None, *, conten
         await ctx.send(f"❌ **Lỗi:** Vui lòng nhập đúng 8 cặp ngoặc vuông `[]` sau tên kênh.\nVí dụ: `!embedcreate #general [Admin] [Chào] [Nội dung] [] [] [Footer] [] [#FFFFFF]`")
 
 
+# ===== HÀM PARSE TIME =====
+def parse_time(time_str):
+    match = re.fullmatch(r'(\d+)(s|min|h|d|m|y)', time_str.strip())
+    if not match:
+        return None
+    value, unit = int(match.group(1)), match.group(2)
+    if unit == 's':
+        return timedelta(seconds=value)
+    elif unit == 'min':
+        return timedelta(minutes=value)
+    elif unit == 'h':
+        return timedelta(hours=value)
+    elif unit == 'd':
+        return timedelta(days=value)
+    elif unit == 'm':
+        return timedelta(days=value * 30)
+    elif unit == 'y':
+        return timedelta(days=value * 365)
+    return None
+
+# ===== KICK =====
+@bot.command()
+async def kick(ctx, member: discord.Member = None):
+    try:
+        if member is None:
+            raise commands.BadArgument()
+        await member.kick()
+        await ctx.send(f"✅ Đã kick {member.mention}")
+    except commands.BadArgument:
+        await ctx.send("Sai cú pháp, cú pháp hiện tại: `!kick @user`")
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi: {e}")
+
+# ===== BAN =====
+@bot.command()
+async def ban(ctx, member: discord.Member = None):
+    try:
+        if member is None:
+            raise commands.BadArgument()
+        await member.ban()
+        await ctx.send(f"✅ Đã ban {member.mention}")
+    except commands.BadArgument:
+        await ctx.send("Sai cú pháp, cú pháp hiện tại: `!ban @user`")
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi: {e}")
+
+        # ===== UNBAN =====
+@bot.command()
+async def unban(ctx, user_id: int = None):
+    try:
+        if user_id is None:
+            raise commands.BadArgument()
+        user = await bot.fetch_user(user_id)
+        await ctx.guild.unban(user)
+        await ctx.send(f"✅ Đã unban user ID `{user_id}`")
+    except commands.BadArgument:
+        await ctx.send("Sai cú pháp, cú pháp hiện tại: `!unban <userID>`")
+    except discord.NotFound:
+        await ctx.send("❌ Không tìm thấy user hoặc user chưa bị ban.")
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi: {e}")
+
+# ===== TIMEOUT =====
+@bot.command()
+async def timeout(ctx, member: discord.Member = None, time_str: str = None):
+    try:
+        if member is None or time_str is None:
+            raise commands.BadArgument()
+        delta = parse_time(time_str)
+        if delta is None:
+            raise commands.BadArgument()
+        # Discord giới hạn tối đa 28 ngày
+        if delta > timedelta(days=28):
+            delta = timedelta(days=28)
+        until = datetime.now(timezone.utc) + delta
+        await member.timeout(until)
+        await ctx.send(f"✅ Đã timeout {member.mention} trong {time_str}")
+    except commands.BadArgument:
+        await ctx.send("Sai cú pháp, cú pháp hiện tại: `!timeout @user <time>` (ví dụ: `5s`, `5min`, `5h`, `5d`, `5m`, `5y`)")
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi: {e}")
+
+
 # 3. Run
-token = os.environ.get('DISCORD_TOKEN')
+token = os.getenv('DISCORD_TOKEN')
 bot.run(token)
