@@ -1,4 +1,5 @@
 import discord
+import os
 from discord.ext import commands
 
 # 1. Setup Intents
@@ -48,4 +49,4 @@ async def say(ctx, *, args):
 
 
 # 3. Run
-bot.run('MTQ5NTI0NDc0NTAyNTUxOTgwNg.GVrYMu.pPSbKoGHNxLuLdREtAQmRlhaR9qE7vrK4npGXw')
+bot.run(os.getenv("TOKEN"))
