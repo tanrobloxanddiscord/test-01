@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+import re
 
 # 1. Setup Intents
 intents = discord.Intents.default()
@@ -31,7 +32,7 @@ class ChannelOrID(commands.Converter):
         except:
             raise commands.BadArgument("Channel không hợp lệ 😐")
 
-# ====== COMMAND =====
+# ====== SAY COMMAND =====
 @bot.command()
 async def say(ctx, *, args):
     try:
@@ -45,6 +46,67 @@ async def say(ctx, *, args):
 
     except Exception as e:
         await ctx.send(f"Sai cú pháp: !say text channel_ID/#channel.")
+
+
+# --- LỆNH EMBED CREATE ---
+@bot.command()
+async def embedcreate(ctx, *, content: str = None):
+    # 1. Kiểm tra nếu không nhập gì sau lệnh
+    if content is None:
+        await ctx.send("Vui lòng nhập theo cú pháp: `!embedcreate [Author] [Title] [Desc] [Img] [Thumb] [Footer] [FooterIcon] [Color]`")
+        return
+
+    try:
+        # 2. Dùng Regex để tách nội dung trong các cặp []
+        params = re.findall(r'\[(.*?)\]', content)
+
+        # 3. Kiểm tra số lượng tham số (phải đủ 8)
+        if len(params) != 8:
+            raise ValueError("Sai số lượng tham số")
+
+        # Gán biến
+        author_v, title_v, desc_v, img_v, thumb_v, foot_v, foot_i_v, color_v = params
+
+        # Hàm xử lý chuỗi trống
+        def clean(val):
+            val = val.strip()
+            return None if val == "" else val
+
+        # 4. Xử lý màu sắc
+        hex_code = clean(color_v)
+        final_color = 0x000000 # Mặc định màu đen
+        if hex_code:
+            try:
+                final_color = int(hex_code.replace("#", ""), 16)
+            except:
+                pass
+
+        # 5. Khởi tạo Embed
+        embed = discord.Embed(
+            title=clean(title_v),
+            description=clean(desc_v),
+            color=final_color
+        )
+
+        # Thêm các thành phần nếu có nội dung
+        if clean(author_v):
+            embed.set_author(name=author_v)
+        
+        if clean(thumb_v):
+            embed.set_thumbnail(url=thumb_v)
+            
+        if clean(img_v):
+            embed.set_image(url=img_v)
+
+        if clean(foot_v):
+            embed.set_footer(text=foot_v, icon_url=clean(foot_i_v))
+
+        # 6. Gửi Embed thành công
+        await ctx.send(embed=embed)
+
+    except Exception:
+        # Báo lỗi nếu nhập sai định dạng hoặc thiếu ngoặc
+        await ctx.send("❌ **Lỗi:** Vui lòng nhập đúng 8 cặp ngoặc vuông `[]`. \nCú pháp: `!embedcreate [Author] [Title] [Description] [ImageURL] [ThumbnailURL] [Footer] [FooterIconURL] [ColorHEX]`")
 
 
 # 3. Run
