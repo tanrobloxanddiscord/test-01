@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 import re
+import os
 
 # 1. Setup Intents
 intents = discord.Intents.default()
@@ -112,4 +113,5 @@ async def embedcreate(ctx, target_channel: discord.TextChannel = None, *, conten
 
 
 # 3. Run
-bot.run('DISCORD_TOKEN')
+token = os.environ.get('DISCORD_TOKEN')
+bot.run(token)
