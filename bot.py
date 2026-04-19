@@ -1,5 +1,4 @@
 import discord
-import os
 from discord.ext import commands
 
 # 1. Setup Intents
@@ -49,6 +48,4 @@ async def say(ctx, *, args):
 
 
 # 3. Run
-from keep_alive import keep_alive
-keep_alive()
 bot.run(os.getenv("TOKEN"))
