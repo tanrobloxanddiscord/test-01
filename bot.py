@@ -2,6 +2,7 @@ import discord
 import os
 import re
 from discord.ext import commands
+from discord.ext import app_commands
 from datetime import timedelta, datetime, timezone
 
 # 1. Setup Intents
@@ -13,6 +14,7 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 
 @bot.event
 async def on_ready():
+    await bot.tree.sync()
     print(f'Logged in as {bot.user.name} (ID: {bot.user.id})')
 
 
@@ -207,6 +209,85 @@ async def untimeout(ctx, member: discord.Member = None):
         await ctx.send("Sai cú pháp, cú pháp hiện tại: `!untimeout @user`")
     except Exception as e:
         await ctx.send(f"❌ Lỗi: {e}")
+
+# ===== HELP =====
+COMMANDS = [
+    ("!ping", None, "!ping", "Kiểm tra bot còn hoạt động không."),
+    ("!say", None, "!say <text> <#channel|channelID>", "Gửi tin nhắn đến channel chỉ định."),
+    ("!embedcreate", None, "!embedcreate #channel [Author] [Title] [Desc] [Img] [Thumb] [Footer] [FooterIcon] [Color]", "Tạo và gửi embed vào channel."),
+    ("!kick", "/kick", "!kick @user", "Đuổi người dùng khỏi server."),
+    ("!ban", "/ban", "!ban @user", "Cấm người dùng khỏi server."),
+    ("!unban", "/unban", "!unban <userID>", "Gỡ cấm người dùng."),
+    ("!timeout", "/timeout", "!timeout @user <time>", "Timeout người dùng (5s, 5min, 5h, 5d, 5m, 5y)."),
+    ("!untimeout", "/untimeout", "!untimeout @user", "Gỡ timeout người dùng."),
+]
+
+@bot.command(name="help")
+async def help_command(ctx):
+    lines = [f"📋 **Tổng cộng: {len(COMMANDS)} lệnh**"]
+    for cmd, slash, syntax, desc in COMMANDS:
+        name = f"{cmd} ({slash})" if slash else cmd
+        lines.append(f"`{name}` - `{syntax}` - {desc}")
+    await ctx.send("\n".join(lines))
+
+@bot.tree.command(name="help", description="Hiển thị danh sách lệnh")
+async def slash_help(interaction: discord.Interaction):
+    lines = [f"📋 **Tổng cộng: {len(COMMANDS)} lệnh**"]
+    for cmd, slash, syntax, desc in COMMANDS:
+        name = f"{cmd} ({slash})" if slash else cmd
+        lines.append(f"`{name}` - `{syntax}` - {desc}")
+    await interaction.response.send_message("\n".join(lines))
+
+# ===== SLASH MODERATION =====
+@bot.tree.command(name="kick", description="Đuổi người dùng khỏi server")
+async def slash_kick(interaction: discord.Interaction, member: discord.Member):
+    try:
+        await member.kick()
+        await interaction.response.send_message(f"✅ Đã kick {member.mention}")
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Lỗi: {e}")
+
+@bot.tree.command(name="ban", description="Cấm người dùng khỏi server")
+async def slash_ban(interaction: discord.Interaction, member: discord.Member):
+    try:
+        await member.ban()
+        await interaction.response.send_message(f"✅ Đã ban {member.mention}")
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Lỗi: {e}")
+
+@bot.tree.command(name="unban", description="Gỡ cấm người dùng")
+async def slash_unban(interaction: discord.Interaction, user_id: str):
+    try:
+        user = await bot.fetch_user(int(user_id))
+        await interaction.guild.unban(user)
+        await interaction.response.send_message(f"✅ Đã unban user ID `{user_id}`")
+    except discord.NotFound:
+        await interaction.response.send_message("❌ Không tìm thấy user hoặc user chưa bị ban.")
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Lỗi: {e}")
+
+@bot.tree.command(name="timeout", description="Timeout người dùng")
+async def slash_timeout(interaction: discord.Interaction, member: discord.Member, time: str):
+    try:
+        delta = parse_time(time)
+        if delta is None:
+            await interaction.response.send_message("❌ Thời gian không hợp lệ. Ví dụ: `5s`, `5min`, `5h`, `5d`, `5m`, `5y`")
+            return
+        if delta > timedelta(days=28):
+            delta = timedelta(days=28)
+        until = datetime.now(timezone.utc) + delta
+        await member.timeout(until)
+        await interaction.response.send_message(f"✅ Đã timeout {member.mention} trong {time}")
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Lỗi: {e}")
+
+@bot.tree.command(name="untimeout", description="Gỡ timeout người dùng")
+async def slash_untimeout(interaction: discord.Interaction, member: discord.Member):
+    try:
+        await member.timeout(None)
+        await interaction.response.send_message(f"✅ Đã gỡ timeout cho {member.mention}")
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Lỗi: {e}")
 
 
 # 3. Run
