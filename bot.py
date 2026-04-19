@@ -30,7 +30,7 @@ class ChannelOrID(commands.Converter):
         try:
             return await ctx.bot.fetch_channel(int(argument))
         except:
-            raise commands.BadArgument("Channel không hợp lệ 😐")
+            raise commands.BadArgument("Channel không hợp lệ.")
 
 # ====== SAY COMMAND =====
 @bot.command()
@@ -48,23 +48,23 @@ async def say(ctx, *, args):
         await ctx.send(f"Sai cú pháp: !say text channel_ID/#channel.")
 
 
-# --- LỆNH EMBED CREATE ---
+# --- EMBEDCREATE COMMAND ---
 @bot.command()
-async def embedcreate(ctx, *, content: str = None):
-    # 1. Kiểm tra nếu không nhập gì sau lệnh
-    if content is None:
-        await ctx.send("Vui lòng nhập theo cú pháp: `!embedcreate [Author] [Title] [Desc] [Img] [Thumb] [Footer] [FooterIcon] [Color]`")
+async def embedcreate(ctx, target_channel: discord.TextChannel = None, *, content: str = None):
+    # 1. Kiểm tra nếu thiếu channel hoặc nội dung
+    if target_channel is None or content is None:
+        await ctx.send("❌ **Cú pháp sai!**\nVui lòng dùng: `!embedcreate #channel [Author] [Title] [Desc] [Img] [Thumb] [Footer] [FooterIcon] [Color]`")
         return
 
     try:
-        # 2. Dùng Regex để tách nội dung trong các cặp []
+        # 2. Dùng Regex để tách 8 nội dung trong các cặp []
         params = re.findall(r'\[(.*?)\]', content)
 
-        # 3. Kiểm tra số lượng tham số (phải đủ 8)
+        # 3. Kiểm tra số lượng tham số (phải đủ 8 cặp ngoặc vuông)
         if len(params) != 8:
-            raise ValueError("Sai số lượng tham số")
+            raise ValueError("Thiếu hoặc thừa tham số")
 
-        # Gán biến
+        # Gán biến từ mảng params
         author_v, title_v, desc_v, img_v, thumb_v, foot_v, foot_i_v, color_v = params
 
         # Hàm xử lý chuỗi trống
@@ -74,7 +74,7 @@ async def embedcreate(ctx, *, content: str = None):
 
         # 4. Xử lý màu sắc
         hex_code = clean(color_v)
-        final_color = 0x000000 # Mặc định màu đen
+        final_color = 0x000000 
         if hex_code:
             try:
                 final_color = int(hex_code.replace("#", ""), 16)
@@ -88,7 +88,6 @@ async def embedcreate(ctx, *, content: str = None):
             color=final_color
         )
 
-        # Thêm các thành phần nếu có nội dung
         if clean(author_v):
             embed.set_author(name=author_v)
         
@@ -101,12 +100,15 @@ async def embedcreate(ctx, *, content: str = None):
         if clean(foot_v):
             embed.set_footer(text=foot_v, icon_url=clean(foot_i_v))
 
-        # 6. Gửi Embed thành công
-        await ctx.send(embed=embed)
+        # 6. Gửi Embed vào CHANNEL ĐÃ CHỌN
+        await target_channel.send(embed=embed)
+        
+        # Thông báo xác nhận tại kênh hiện tại
+        await ctx.send(f"✅ Đã gửi Embed thành công vào kênh {target_channel.mention}")
 
-    except Exception:
-        # Báo lỗi nếu nhập sai định dạng hoặc thiếu ngoặc
-        await ctx.send("❌ **Lỗi:** Vui lòng nhập đúng 8 cặp ngoặc vuông `[]`. \nCú pháp: `!embedcreate [Author] [Title] [Description] [ImageURL] [ThumbnailURL] [Footer] [FooterIconURL] [ColorHEX]`")
+    except Exception as e:
+        # Báo lỗi nếu nhập sai định dạng
+        await ctx.send(f"❌ **Lỗi:** Vui lòng nhập đúng 8 cặp ngoặc vuông `[]` sau tên kênh.\nVí dụ: `!embedcreate #general [Admin] [Chào] [Nội dung] [] [] [Footer] [] [#FFFFFF]`")
 
 
 # 3. Run
