@@ -1,6 +1,7 @@
 import discord
 import os
 import re
+import json
 from discord.ext import commands
 from discord import app_commands
 from datetime import timedelta, datetime, timezone
@@ -20,10 +21,37 @@ async def on_ready():
     await bot.tree.sync()
     print(f'Logged in as {bot.user.name} (ID: {bot.user.id})')
 
+@bot.event
+async def on_ready():
+    print(f'Bot {bot.user.name} đã sẵn sàng và đang dùng lưu trữ JSON!')
+
 
 @bot.command()
 async def ping(ctx):
     await ctx.send('Pong!')
+
+
+# --- CẤU HÌNH ---
+intents = discord.Intents.default()
+intents.message_content = True
+bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
+
+# Tên file lưu trữ trên Replit
+DATA_FILE = "Warnings.json"
+
+# --- HÀM XỬ LÝ FILE (Sẽ đọc file mỗi khi dùng lệnh) ---
+def load_json():
+    try:
+        if os.path.exists(DATA_FILE):
+            with open(DATA_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        return {}
+    except:
+        return {}
+
+def save_json(data):
+    with open(DATA_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
 
 # ===== CONVERTER =====
@@ -178,50 +206,53 @@ async def clear(ctx, amount: int = None):
     except Exception as e:
         await ctx.send(f"❌ Lỗi: {e}")
 
-# ===== WARN =====
+# --- LỆNH WARN (Ghi vào file) ---
 @bot.command()
 async def warn(ctx, member: discord.Member = None, *, reason: str = "Không có lý do"):
-    try:
-        if member is None: raise commands.BadArgument()
-        uid = str(member.id)
-        if uid not in warns_data: warns_data[uid] = []
-        warns_data[uid].append(reason)
-        await ctx.send(f"⚠️ Đã cảnh cáo {member.mention}. Lý do: **{reason}** | Tổng cảnh cáo: {len(warns_data[uid])}")
-    except commands.BadArgument:
-        await ctx.send("Sai cú pháp, cú pháp hiện tại: `!warn @user <lý do>`")
-    except Exception as e:
-        await ctx.send(f"❌ Lỗi: {e}")
+    if member is None:
+        return await ctx.send("Sai cú pháp, hãy dùng: `!warn @user <lý do>`")
+    
+    data = load_json() # Đọc file từ ổ cứng Replit 
+    uid = str(member.id)
+    
+    if uid not in data:
+        data[uid] = []
+    
+    # Thêm thông tin mới
+    data[uid].append({
+        "reason": reason,
+        "time": datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    })
+    
+    save_json(data) # Lưu lại vào file JSON 
+    await ctx.send(f"⚠️ Đã cảnh cáo {member.mention}. Lý do: **{reason}** | Tổng cảnh cáo: {len(data[uid])}")
 
-# ===== WARNS =====
+# --- LỆNH WARNS (Đọc từ file và gửi lên server) ---
 @bot.command()
 async def warns(ctx, member: discord.Member = None):
-    try:
-        if member is None: raise commands.BadArgument()
-        uid = str(member.id)
-        w = warns_data.get(uid, [])
-        if not w:
-            await ctx.send(f"✅ {member.mention} chưa có cảnh cáo nào.")
-        else:
-            lines = [f"⚠️ **Cảnh cáo của {member.display_name} ({len(w)} lần):**"]
-            for i, r in enumerate(w, 1):
-                lines.append(f"{i}. {r}")
-            await ctx.send("\n".join(lines))
-    except commands.BadArgument:
-        await ctx.send("Sai cú pháp, cú pháp hiện tại: `!warns @user`")
-    except Exception as e:
-        await ctx.send(f"❌ Lỗi: {e}")
+    member = member or ctx.author
+    uid = str(member.id)
+    
+    data = load_json() # Đọc file để lấy dữ liệu cũ 
+    user_warns = data.get(uid, [])
+    
+    if not user_warns:
+        await ctx.send(f"✅ {member.mention} chưa có cảnh cáo nào.")
+    else:
+        lines = [f"⚠️ **Cảnh cáo của {member.display_name} ({len(user_warns)} lần):**"]
+        for i, item in enumerate(user_warns, 1):
+            # Lấy lý do từ file và gửi lên server 
+            lines.append(f"{i}. {item['reason']} ({item['time']})")
+        await ctx.send("\n".join(lines))
 
-# ===== CLEARWARN =====
+# --- LỆNH XÓA WARN ---
 @bot.command()
 async def clearwarn(ctx, member: discord.Member = None):
-    try:
-        if member is None: raise commands.BadArgument()
-        warns_data[str(member.id)] = []
-        await ctx.send(f"✅ Đã xóa toàn bộ cảnh cáo của {member.mention}")
-    except commands.BadArgument:
-        await ctx.send("Sai cú pháp, cú pháp hiện tại: `!clearwarn @user`")
-    except Exception as e:
-        await ctx.send(f"❌ Lỗi: {e}")
+    if member is None: return
+    data = load_json()
+    data[str(member.id)] = []
+    save_json(data)
+    await ctx.send(f"✅ Đã xóa toàn bộ cảnh cáo của {member.mention}")
 
 # ===== SLOWMODE =====
 @bot.command()
