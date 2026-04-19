@@ -195,6 +195,19 @@ async def timeout(ctx, member: discord.Member = None, time_str: str = None):
     except Exception as e:
         await ctx.send(f"❌ Lỗi: {e}")
 
+        # ===== UNTIMEOUT =====
+@bot.command()
+async def untimeout(ctx, member: discord.Member = None):
+    try:
+        if member is None:
+            raise commands.BadArgument()
+        await member.timeout(None)
+        await ctx.send(f"✅ Đã gỡ timeout cho {member.mention}")
+    except commands.BadArgument:
+        await ctx.send("Sai cú pháp, cú pháp hiện tại: `!untimeout @user`")
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi: {e}")
+
 
 # 3. Run
 token = os.getenv('DISCORD_TOKEN')
