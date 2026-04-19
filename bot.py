@@ -110,4 +110,4 @@ async def embedcreate(ctx, *, content: str = None):
 
 
 # 3. Run
-bot.run(D)
+bot.run(DISCORD_TOKEN)
