@@ -2,7 +2,7 @@ import discord
 import os
 import re
 from discord.ext import commands
-from discord.ext import app_commands
+from discord import app_commands
 from datetime import timedelta, datetime, timezone
 
 # 1. Setup Intents
@@ -10,7 +10,10 @@ intents = discord.Intents.default()
 intents.message_content = True
 
 # 2. Initialize Bot
-bot = commands.Bot(command_prefix='!', intents=intents)
+bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
+
+# Warn data (in-memory, reset khi bot khởi động lại)
+warns_data = {}
 
 @bot.event
 async def on_ready():
@@ -30,7 +33,6 @@ class ChannelOrID(commands.Converter):
             return await commands.TextChannelConverter().convert(ctx, argument)
         except commands.BadArgument:
             pass
-
         try:
             return await ctx.bot.fetch_channel(int(argument))
         except:
@@ -40,14 +42,9 @@ class ChannelOrID(commands.Converter):
 @bot.command()
 async def say(ctx, *, args):
     try:
-        # tách phần cuối là channel
         text, channel_input = args.rsplit(" ", 1)
-
-        # convert channel
         channel = await ChannelOrID().convert(ctx, channel_input)
-
         await channel.send(text)
-
     except Exception as e:
         await ctx.send(f"Sai cú pháp: !say text channel_ID/#channel.")
 
@@ -55,64 +52,33 @@ async def say(ctx, *, args):
 # --- EMBEDCREATE COMMAND ---
 @bot.command()
 async def embedcreate(ctx, target_channel: discord.TextChannel = None, *, content: str = None):
-    # 1. Kiểm tra nếu thiếu channel hoặc nội dung
     if target_channel is None or content is None:
         await ctx.send("❌ **Cú pháp sai!**\nVui lòng dùng: `!embedcreate #channel [Author] [Title] [Desc] [Img] [Thumb] [Footer] [FooterIcon] [Color]`")
         return
-
     try:
-        # 2. Dùng Regex để tách 8 nội dung trong các cặp []
         params = re.findall(r'\[(.*?)\]', content)
-
-        # 3. Kiểm tra số lượng tham số (phải đủ 8 cặp ngoặc vuông)
         if len(params) != 8:
             raise ValueError("Thiếu hoặc thừa tham số")
-
-        # Gán biến từ mảng params
         author_v, title_v, desc_v, img_v, thumb_v, foot_v, foot_i_v, color_v = params
-
-        # Hàm xử lý chuỗi trống
         def clean(val):
             val = val.strip()
             return None if val == "" else val
-
-        # 4. Xử lý màu sắc
         hex_code = clean(color_v)
-        final_color = 0x000000 
+        final_color = 0x000000
         if hex_code:
             try:
                 final_color = int(hex_code.replace("#", ""), 16)
             except:
                 pass
-
-        # 5. Khởi tạo Embed
-        embed = discord.Embed(
-            title=clean(title_v),
-            description=clean(desc_v),
-            color=final_color
-        )
-
-        if clean(author_v):
-            embed.set_author(name=author_v)
-        
-        if clean(thumb_v):
-            embed.set_thumbnail(url=thumb_v)
-            
-        if clean(img_v):
-            embed.set_image(url=img_v)
-
-        if clean(foot_v):
-            embed.set_footer(text=foot_v, icon_url=clean(foot_i_v))
-
-        # 6. Gửi Embed vào CHANNEL ĐÃ CHỌN
+        embed = discord.Embed(title=clean(title_v), description=clean(desc_v), color=final_color)
+        if clean(author_v): embed.set_author(name=author_v)
+        if clean(thumb_v): embed.set_thumbnail(url=thumb_v)
+        if clean(img_v): embed.set_image(url=img_v)
+        if clean(foot_v): embed.set_footer(text=foot_v, icon_url=clean(foot_i_v))
         await target_channel.send(embed=embed)
-        
-        # Thông báo xác nhận tại kênh hiện tại
         await ctx.send(f"✅ Đã gửi Embed thành công vào kênh {target_channel.mention}")
-
     except Exception as e:
-        # Báo lỗi nếu nhập sai định dạng
-        await ctx.send(f"❌ **Lỗi:** Vui lòng nhập đúng 8 cặp ngoặc vuông `[]` sau tên kênh.\nVí dụ: `!embedcreate #general [Admin] [Chào] [Nội dung] [] [] [Footer] [] [#FFFFFF]`")
+        await ctx.send(f"❌ **Lỗi:** Vui lòng nhập đúng 8 cặp ngoặc vuông `[]`.\nVí dụ: `!embedcreate #general [Admin] [Chào] [Nội dung] [] [] [Footer] [] [#FFFFFF]`")
 
 
 # ===== HÀM PARSE TIME =====
@@ -121,26 +87,19 @@ def parse_time(time_str):
     if not match:
         return None
     value, unit = int(match.group(1)), match.group(2)
-    if unit == 's':
-        return timedelta(seconds=value)
-    elif unit == 'min':
-        return timedelta(minutes=value)
-    elif unit == 'h':
-        return timedelta(hours=value)
-    elif unit == 'd':
-        return timedelta(days=value)
-    elif unit == 'm':
-        return timedelta(days=value * 30)
-    elif unit == 'y':
-        return timedelta(days=value * 365)
+    if unit == 's': return timedelta(seconds=value)
+    elif unit == 'min': return timedelta(minutes=value)
+    elif unit == 'h': return timedelta(hours=value)
+    elif unit == 'd': return timedelta(days=value)
+    elif unit == 'm': return timedelta(days=value * 30)
+    elif unit == 'y': return timedelta(days=value * 365)
     return None
 
 # ===== KICK =====
 @bot.command()
 async def kick(ctx, member: discord.Member = None):
     try:
-        if member is None:
-            raise commands.BadArgument()
+        if member is None: raise commands.BadArgument()
         await member.kick()
         await ctx.send(f"✅ Đã kick {member.mention}")
     except commands.BadArgument:
@@ -152,8 +111,7 @@ async def kick(ctx, member: discord.Member = None):
 @bot.command()
 async def ban(ctx, member: discord.Member = None):
     try:
-        if member is None:
-            raise commands.BadArgument()
+        if member is None: raise commands.BadArgument()
         await member.ban()
         await ctx.send(f"✅ Đã ban {member.mention}")
     except commands.BadArgument:
@@ -161,12 +119,11 @@ async def ban(ctx, member: discord.Member = None):
     except Exception as e:
         await ctx.send(f"❌ Lỗi: {e}")
 
-        # ===== UNBAN =====
+# ===== UNBAN =====
 @bot.command()
 async def unban(ctx, user_id: int = None):
     try:
-        if user_id is None:
-            raise commands.BadArgument()
+        if user_id is None: raise commands.BadArgument()
         user = await bot.fetch_user(user_id)
         await ctx.guild.unban(user)
         await ctx.send(f"✅ Đã unban user ID `{user_id}`")
@@ -181,14 +138,10 @@ async def unban(ctx, user_id: int = None):
 @bot.command()
 async def timeout(ctx, member: discord.Member = None, time_str: str = None):
     try:
-        if member is None or time_str is None:
-            raise commands.BadArgument()
+        if member is None or time_str is None: raise commands.BadArgument()
         delta = parse_time(time_str)
-        if delta is None:
-            raise commands.BadArgument()
-        # Discord giới hạn tối đa 28 ngày
-        if delta > timedelta(days=28):
-            delta = timedelta(days=28)
+        if delta is None: raise commands.BadArgument()
+        if delta > timedelta(days=28): delta = timedelta(days=28)
         until = datetime.now(timezone.utc) + delta
         await member.timeout(until)
         await ctx.send(f"✅ Đã timeout {member.mention} trong {time_str}")
@@ -197,16 +150,174 @@ async def timeout(ctx, member: discord.Member = None, time_str: str = None):
     except Exception as e:
         await ctx.send(f"❌ Lỗi: {e}")
 
-        # ===== UNTIMEOUT =====
+# ===== UNTIMEOUT =====
 @bot.command()
 async def untimeout(ctx, member: discord.Member = None):
     try:
-        if member is None:
-            raise commands.BadArgument()
+        if member is None: raise commands.BadArgument()
         await member.timeout(None)
         await ctx.send(f"✅ Đã gỡ timeout cho {member.mention}")
     except commands.BadArgument:
         await ctx.send("Sai cú pháp, cú pháp hiện tại: `!untimeout @user`")
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi: {e}")
+
+# ===== CLEAR =====
+@bot.command()
+async def clear(ctx, amount: int = None):
+    try:
+        if amount is None: raise commands.BadArgument()
+        if amount < 1 or amount > 100:
+            await ctx.send("❌ Số lượng phải từ 1 đến 100.")
+            return
+        deleted = await ctx.channel.purge(limit=amount)
+        msg = await ctx.send(f"✅ Đã xóa {len(deleted)} tin nhắn.")
+        await msg.delete(delay=3)
+    except commands.BadArgument:
+        await ctx.send("Sai cú pháp, cú pháp hiện tại: `!clear <số>`")
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi: {e}")
+
+# ===== WARN =====
+@bot.command()
+async def warn(ctx, member: discord.Member = None, *, reason: str = "Không có lý do"):
+    try:
+        if member is None: raise commands.BadArgument()
+        uid = str(member.id)
+        if uid not in warns_data: warns_data[uid] = []
+        warns_data[uid].append(reason)
+        await ctx.send(f"⚠️ Đã cảnh cáo {member.mention}. Lý do: **{reason}** | Tổng cảnh cáo: {len(warns_data[uid])}")
+    except commands.BadArgument:
+        await ctx.send("Sai cú pháp, cú pháp hiện tại: `!warn @user <lý do>`")
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi: {e}")
+
+# ===== WARNS =====
+@bot.command()
+async def warns(ctx, member: discord.Member = None):
+    try:
+        if member is None: raise commands.BadArgument()
+        uid = str(member.id)
+        w = warns_data.get(uid, [])
+        if not w:
+            await ctx.send(f"✅ {member.mention} chưa có cảnh cáo nào.")
+        else:
+            lines = [f"⚠️ **Cảnh cáo của {member.display_name} ({len(w)} lần):**"]
+            for i, r in enumerate(w, 1):
+                lines.append(f"{i}. {r}")
+            await ctx.send("\n".join(lines))
+    except commands.BadArgument:
+        await ctx.send("Sai cú pháp, cú pháp hiện tại: `!warns @user`")
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi: {e}")
+
+# ===== CLEARWARN =====
+@bot.command()
+async def clearwarn(ctx, member: discord.Member = None):
+    try:
+        if member is None: raise commands.BadArgument()
+        warns_data[str(member.id)] = []
+        await ctx.send(f"✅ Đã xóa toàn bộ cảnh cáo của {member.mention}")
+    except commands.BadArgument:
+        await ctx.send("Sai cú pháp, cú pháp hiện tại: `!clearwarn @user`")
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi: {e}")
+
+# ===== SLOWMODE =====
+@bot.command()
+async def slowmode(ctx, time_str: str = None):
+    try:
+        if time_str is None: raise commands.BadArgument()
+        if time_str in ("0", "off"):
+            await ctx.channel.edit(slowmode_delay=0)
+            await ctx.send("✅ Đã tắt slowmode.")
+            return
+        delta = parse_time(time_str)
+        if delta is None: raise commands.BadArgument()
+        seconds = min(int(delta.total_seconds()), 21600)
+        await ctx.channel.edit(slowmode_delay=seconds)
+        await ctx.send(f"✅ Đã bật slowmode **{time_str}** cho channel này.")
+    except commands.BadArgument:
+        await ctx.send("Sai cú pháp, cú pháp hiện tại: `!slowmode <time>` hoặc `!slowmode off`")
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi: {e}")
+
+# ===== LOCK =====
+@bot.command()
+async def lock(ctx):
+    try:
+        await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=False)
+        await ctx.send("🔒 Channel đã bị khóa.")
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi: {e}")
+
+# ===== UNLOCK =====
+@bot.command()
+async def unlock(ctx):
+    try:
+        await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=True)
+        await ctx.send("🔓 Channel đã được mở.")
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi: {e}")
+
+# ===== USERINFO =====
+@bot.command()
+async def userinfo(ctx, member: discord.Member = None):
+    try:
+        member = member or ctx.author
+        roles = [r.mention for r in member.roles if r.name != "@everyone"]
+        embed = discord.Embed(title=f"Thông tin: {member.display_name}", color=member.color)
+        embed.set_thumbnail(url=member.display_avatar.url)
+        embed.add_field(name="ID", value=member.id, inline=True)
+        embed.add_field(name="Tên", value=str(member), inline=True)
+        embed.add_field(name="Tham gia server", value=member.joined_at.strftime("%d/%m/%Y"), inline=True)
+        embed.add_field(name="Tạo tài khoản", value=member.created_at.strftime("%d/%m/%Y"), inline=True)
+        embed.add_field(name=f"Roles ({len(roles)})", value=" ".join(roles) if roles else "Không có", inline=False)
+        await ctx.send(embed=embed)
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi: {e}")
+
+# ===== SERVERINFO =====
+@bot.command()
+async def serverinfo(ctx):
+    try:
+        g = ctx.guild
+        embed = discord.Embed(title=f"Thông tin: {g.name}", color=discord.Color.blue())
+        if g.icon: embed.set_thumbnail(url=g.icon.url)
+        embed.add_field(name="ID", value=g.id, inline=True)
+        embed.add_field(name="Owner", value=g.owner.mention, inline=True)
+        embed.add_field(name="Thành viên", value=g.member_count, inline=True)
+        embed.add_field(name="Channels", value=len(g.channels), inline=True)
+        embed.add_field(name="Roles", value=len(g.roles), inline=True)
+        embed.add_field(name="Ngày tạo", value=g.created_at.strftime("%d/%m/%Y"), inline=True)
+        await ctx.send(embed=embed)
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi: {e}")
+
+# ===== AVATAR =====
+@bot.command()
+async def avatar(ctx, member: discord.Member = None):
+    try:
+        member = member or ctx.author
+        embed = discord.Embed(title=f"Avatar của {member.display_name}", color=discord.Color.blurple())
+        embed.set_image(url=member.display_avatar.url)
+        await ctx.send(embed=embed)
+    except Exception as e:
+        await ctx.send(f"❌ Lỗi: {e}")
+
+# ===== POLL =====
+@bot.command()
+async def poll(ctx, *, question: str = None):
+    try:
+        if question is None: raise commands.BadArgument()
+        embed = discord.Embed(title="📊 Poll", description=question, color=discord.Color.gold())
+        embed.set_footer(text=f"Tạo bởi {ctx.author.display_name}")
+        await ctx.message.delete()
+        msg = await ctx.send(embed=embed)
+        await msg.add_reaction("✅")
+        await msg.add_reaction("❌")
+    except commands.BadArgument:
+        await ctx.send("Sai cú pháp, cú pháp hiện tại: `!poll <câu hỏi>`")
     except Exception as e:
         await ctx.send(f"❌ Lỗi: {e}")
 
@@ -220,6 +331,17 @@ COMMANDS = [
     ("!unban", "/unban", "!unban <userID>", "Gỡ cấm người dùng."),
     ("!timeout", "/timeout", "!timeout @user <time>", "Timeout người dùng (5s, 5min, 5h, 5d, 5m, 5y)."),
     ("!untimeout", "/untimeout", "!untimeout @user", "Gỡ timeout người dùng."),
+    ("!clear", None, "!clear <số>", "Xóa hàng loạt tin nhắn (tối đa 100)."),
+    ("!warn", None, "!warn @user <lý do>", "Cảnh cáo người dùng."),
+    ("!warns", None, "!warns @user", "Xem danh sách cảnh cáo của user."),
+    ("!clearwarn", None, "!clearwarn @user", "Xóa toàn bộ cảnh cáo của user."),
+    ("!slowmode", None, "!slowmode <time> hoặc off", "Bật/tắt slowmode cho channel."),
+    ("!lock", None, "!lock", "Khóa channel, không cho user gửi tin."),
+    ("!unlock", None, "!unlock", "Mở khóa channel."),
+    ("!userinfo", None, "!userinfo @user", "Xem thông tin của một user."),
+    ("!serverinfo", None, "!serverinfo", "Xem thông tin server."),
+    ("!avatar", None, "!avatar @user", "Lấy avatar của user."),
+    ("!poll", None, "!poll <câu hỏi>", "Tạo poll vote ✅❌."),
 ]
 
 @bot.command(name="help")
@@ -273,8 +395,7 @@ async def slash_timeout(interaction: discord.Interaction, member: discord.Member
         if delta is None:
             await interaction.response.send_message("❌ Thời gian không hợp lệ. Ví dụ: `5s`, `5min`, `5h`, `5d`, `5m`, `5y`")
             return
-        if delta > timedelta(days=28):
-            delta = timedelta(days=28)
+        if delta > timedelta(days=28): delta = timedelta(days=28)
         until = datetime.now(timezone.utc) + delta
         await member.timeout(until)
         await interaction.response.send_message(f"✅ Đã timeout {member.mention} trong {time}")
@@ -292,4 +413,6 @@ async def slash_untimeout(interaction: discord.Interaction, member: discord.Memb
 
 # 3. Run
 token = os.getenv('DISCORD_TOKEN')
+if not token:
+    raise ValueError("DISCORD_TOKEN environment variable is not set.")
 bot.run(token)
