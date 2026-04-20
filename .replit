@@ -7,4 +7,26 @@ expertMode = true
 [userenv]
 
 [userenv.shared]
-DISCORD_TOKEN = "MTQ5NTI0NDc0NTAyNTUxOTgwNg.GC0eHs.3toFTFkHkk3eJvcMX9yfnA2LyVDMNt-RU1s7s8"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python bot.py"
+
+[workflows.workflow.metadata]
+outputType = "console"

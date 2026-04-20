@@ -13,33 +13,9 @@ intents.message_content = True
 # 2. Initialize Bot
 bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
 
-# Warn data (in-memory, reset khi bot khởi động lại)
-warns_data = {}
-
-@bot.event
-async def on_ready():
-    await bot.tree.sync()
-    print(f'Logged in as {bot.user.name} (ID: {bot.user.id})')
-
-@bot.event
-async def on_ready():
-    print(f'Bot {bot.user.name} đã sẵn sàng và đang dùng lưu trữ JSON!')
-
-
-@bot.command()
-async def ping(ctx):
-    await ctx.send('Pong!')
-
-
-# --- CẤU HÌNH ---
-intents = discord.Intents.default()
-intents.message_content = True
-bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
-
-# Tên file lưu trữ trên Replit
+# --- CẤU HÌNH FILE LƯU WARNINGS ---
 DATA_FILE = "Warnings.json"
 
-# --- HÀM XỬ LÝ FILE (Sẽ đọc file mỗi khi dùng lệnh) ---
 def load_json():
     try:
         if os.path.exists(DATA_FILE):
@@ -52,6 +28,17 @@ def load_json():
 def save_json(data):
     with open(DATA_FILE, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
+
+
+@bot.event
+async def on_ready():
+    await bot.tree.sync()
+    print(f'Logged in as {bot.user.name} (ID: {bot.user.id})')
+
+
+@bot.command()
+async def ping(ctx):
+    await ctx.send('Pong!')
 
 
 # ===== CONVERTER =====
@@ -206,49 +193,42 @@ async def clear(ctx, amount: int = None):
     except Exception as e:
         await ctx.send(f"❌ Lỗi: {e}")
 
-# --- LỆNH WARN (Ghi vào file) ---
+# ===== WARN (Lưu vào Warnings.json) =====
 @bot.command()
 async def warn(ctx, member: discord.Member = None, *, reason: str = "Không có lý do"):
     if member is None:
         return await ctx.send("Sai cú pháp, hãy dùng: `!warn @user <lý do>`")
-    
-    data = load_json() # Đọc file từ ổ cứng Replit 
+    data = load_json()
     uid = str(member.id)
-    
     if uid not in data:
         data[uid] = []
-    
-    # Thêm thông tin mới
     data[uid].append({
         "reason": reason,
         "time": datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     })
-    
-    save_json(data) # Lưu lại vào file JSON 
+    save_json(data)
     await ctx.send(f"⚠️ Đã cảnh cáo {member.mention}. Lý do: **{reason}** | Tổng cảnh cáo: {len(data[uid])}")
 
-# --- LỆNH WARNS (Đọc từ file và gửi lên server) ---
+# ===== WARNS (Đọc từ Warnings.json) =====
 @bot.command()
 async def warns(ctx, member: discord.Member = None):
     member = member or ctx.author
     uid = str(member.id)
-    
-    data = load_json() # Đọc file để lấy dữ liệu cũ 
+    data = load_json()
     user_warns = data.get(uid, [])
-    
     if not user_warns:
         await ctx.send(f"✅ {member.mention} chưa có cảnh cáo nào.")
     else:
         lines = [f"⚠️ **Cảnh cáo của {member.display_name} ({len(user_warns)} lần):**"]
         for i, item in enumerate(user_warns, 1):
-            # Lấy lý do từ file và gửi lên server 
             lines.append(f"{i}. {item['reason']} ({item['time']})")
         await ctx.send("\n".join(lines))
 
-# --- LỆNH XÓA WARN ---
+# ===== CLEARWARN (Xóa trong Warnings.json) =====
 @bot.command()
 async def clearwarn(ctx, member: discord.Member = None):
-    if member is None: return
+    if member is None:
+        return await ctx.send("Sai cú pháp, hãy dùng: `!clearwarn @user`")
     data = load_json()
     data[str(member.id)] = []
     save_json(data)
@@ -363,7 +343,7 @@ COMMANDS = [
     ("!timeout", "/timeout", "!timeout @user <time>", "Timeout người dùng (5s, 5min, 5h, 5d, 5m, 5y)."),
     ("!untimeout", "/untimeout", "!untimeout @user", "Gỡ timeout người dùng."),
     ("!clear", None, "!clear <số>", "Xóa hàng loạt tin nhắn (tối đa 100)."),
-    ("!warn", None, "!warn @user <lý do>", "Cảnh cáo người dùng."),
+    ("!warn", None, "!warn @user <lý do>", "Cảnh cáo người dùng (lưu vào file)."),
     ("!warns", None, "!warns @user", "Xem danh sách cảnh cáo của user."),
     ("!clearwarn", None, "!clearwarn @user", "Xóa toàn bộ cảnh cáo của user."),
     ("!slowmode", None, "!slowmode <time> hoặc off", "Bật/tắt slowmode cho channel."),
