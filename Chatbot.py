@@ -6,8 +6,8 @@ from google.genai import types
 
 GEMINI_API_KEY = os.getenv("Google_GenAI")
 
-MAX_PROMPT_CHARS = 1000
-MAX_OUTPUT_TOKENS = 300
+MAX_PROMPT_CHARS = 800
+MAX_OUTPUT_TOKENS = 400
 
 
 class ChatbotCog(commands.Cog):
@@ -43,7 +43,7 @@ class ChatbotCog(commands.Cog):
                 )
 
             await message.channel.send(
-                f"⏳ *Đang xử lý câu hỏi của {message.author.name}...*"
+                f"⏳ *Đang tìm kiếm và xử lý câu hỏi của {message.author.name}...*"
             )
 
             try:
@@ -56,13 +56,28 @@ class ChatbotCog(commands.Cog):
                             "Tối đa 3 đoạn văn. Không giải thích dài dòng."
                         ),
                         max_output_tokens=MAX_OUTPUT_TOKENS,
+                        tools=[types.Tool(google_search=types.GoogleSearch())],
                     ),
                 )
 
                 bot_response = response.text
 
+                try:
+                    chunks = response.candidates[0].grounding_metadata.grounding_chunks
+                    if chunks:
+                        sources = "\n\n**Nguồn tham khảo:**\n" + "\n".join(
+                            f"- [{c.web.title}]({c.web.uri})"
+                            for c in chunks if c.web
+                        )
+                        bot_response += sources
+                except Exception:
+                    pass
+
                 if len(bot_response) > 1900:
-                    await message.channel.send(bot_response[:1900] + "\n...(Còn tiếp)")
+                    await message.channel.send(
+                        f"⚠️ Câu trả lời quá dài. Dưới đây là phần đầu:"
+                    )
+                    await message.channel.send(bot_response[:1900] + "\n...(Còn tiếp)...")
                 else:
                     await message.channel.send(bot_response)
 
