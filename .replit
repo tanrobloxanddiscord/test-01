@@ -29,4 +29,4 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python Chatbot.py"
+args = "python bot.py"

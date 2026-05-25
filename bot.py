@@ -84,6 +84,7 @@ WEATHER_API_KEY = os.getenv("OpenWeatherMap")
 @bot.event
 async def setup_hook():
     await bot.load_extension("logs")
+    await bot.load_extension("Chatbot")
 
 @bot.event
 async def on_ready():
