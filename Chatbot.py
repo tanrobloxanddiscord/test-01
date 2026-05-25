@@ -20,7 +20,7 @@ class ChatbotCog(commands.Cog):
         if message.author.bot:
             return
 
-        if self.bot.user.mentioned_in(message):
+        if self.bot.user in message.mentions and message.reference is None:
             bot_mention = f"<@{self.bot.user.id}>"
             bot_mention_nick = f"<@!{self.bot.user.id}>"
             prompt = (
