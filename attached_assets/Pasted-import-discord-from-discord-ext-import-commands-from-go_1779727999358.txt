@@ -1,0 +1,75 @@
+import discord
+from discord.ext import commands
+from google import genai
+# Import các hàm từ mục memory vừa viết ở trên
+import memory_manager 
+
+intents = discord.Intents.default()
+intents.message_content = True
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+gemini_client = genai.Client(api_key="YOUR_GEMINI_API_KEY")
+
+@bot.event
+async def on_ready():
+    print(f"🤖 Bot có trí nhớ đã sẵn sàng: {bot.user.name}")
+
+@bot.event
+async def on_message(message):
+    if message.author.bot:
+        return
+
+    # LỆNH ĐẶC BIỆT 1: Người dùng chủ động bắt bot nhớ gì đó (Ví dụ: @bot nhớ rằng tôi thích code python)
+    if bot.user.mentioned_in(message) and "nhớ rằng" in message.content.lower():
+        raw_text = message.content.lower().split("nhớ rằng")[-1].strip()
+        if raw_text:
+            memory_manager.update_user_memory(message.author.id, raw_text)
+            await message.channel.send(f"✅ Ghi nhận! Tôi đã lưu thông tin này vào bộ nhớ của mình về bạn: *\"{raw_text}\"*")
+            return
+
+    # LỆNH ĐẶC BIỆT 2: Người dùng bắt bot quên hết thông tin về mình
+    if bot.user.mentioned_in(message) and "quên tôi đi" in message.content.lower():
+        memory_manager.clear_user_memory(message.author.id)
+        await message.channel.send(f"🧹 Tôi đã xóa sạch toàn bộ bộ nhớ và thông tin liên quan đến {message.author.mention} rồi nhé!")
+        return
+
+    # XỬ LÝ CHAT THÔNG THƯỜNG KÈM TRÍ NHỚ
+    if bot.user.mentioned_in(message):
+        bot_mention = f"<@{bot.user.id}>"
+        bot_mention_nick = f"<@!{bot.user.id}>"
+        prompt = message.content.replace(bot_mention, "").replace(bot_mention_nick, "").strip()
+        
+        if not prompt:
+            await message.channel.send("Bạn cần tôi giúp gì ạ?")
+            return
+
+        await message.channel.send(f"⏳ Đang xử lý câu hỏi...")
+
+        # Đọc xem trước đây có thông tin gì về user này không
+        user_facts = memory_manager.get_user_memory(message.author.id)
+        
+        # Thiết lập System Instruction để "bơm" trí nhớ vào cho Gemini
+        system_prompt = "Bạn là một trợ lý Discord Bot thông minh."
+        if user_facts:
+            system_prompt += f"\nDưới đây là một số thông tin bạn BIẾT CHẮC CHẮN về người dùng đang trò chuyện (Tên Discord: {message.author.name}):{user_facts}\nHãy sử dụng các thông tin này để trả lời cá nhân hóa nếu phù hợp."
+
+        try:
+            # Gọi API Gemini kèm trí nhớ hệ thống và Google Search
+            response = gemini_client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=prompt,
+                config={
+                    'system_instruction': system_prompt, # Đưa trí nhớ vào đây
+                    'tools': [{'google_search': {}}]
+                }
+            )
+            
+            await message.channel.send(response.text)
+                
+        except Exception as e:
+            print(f"❌ Lỗi: {e}")
+            await message.channel.send("Có lỗi xảy ra rồi!")
+
+    await bot.process_commands(message)
+
+bot.run('YOUR_DISCORD_BOT_TOKEN')
